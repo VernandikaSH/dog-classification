@@ -19,9 +19,9 @@ def load_models():
 
     def build_and_initialize(m_type):
         if m_type == 'mobile':
-            base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights=None)
+            base = tf.keras.applications.MobileNetV2(input_shape=(224,224,3), include_top=False, weights='imagenet')
         else:
-            base = tf.keras.applications.EfficientNetB0(input_shape=(224,224,3), include_top=False, weights=None)
+            base = tf.keras.applications.EfficientNetB0(input_shape=(224,224,3), include_top=False, weights='imagenet')
         
         m = tf.keras.Sequential([
             base,
@@ -29,7 +29,7 @@ def load_models():
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(15, activation='softmax')
         ])
-        m.build((None, 224, 224, 3)) 
+        m.build((None, 224, 224, 3))
         return m
 
     model_mobile = build_and_initialize('mobile')
@@ -78,22 +78,62 @@ CLASS_DISPLAY_NAMES = {
     'tzu': 'Shih Tzu'
 }
 
-CONFIDENCE_THRESHOLD = 0.50  # ambang rata-rata keyakinan minimum
+CONFIDENCE_THRESHOLD = 0.50  
 
 # --- PENGUJIAN GAMBAR ---
 st.header("Pengujian Gambar Baru")
 uploaded_file = st.file_uploader("Pilih gambar anjing...", type=["jpg", "jpeg", "png"])
 
+MAX_MB = 10          # batas ukuran berkas yang diterima
+MIN_PIXEL = 32       # dimensi minimum agar citra layak diproses
+ 
 if uploaded_file is not None:
-    img = Image.open(uploaded_file)
-    img = img.convert('RGB')
-    
+ 
+    # --- Validasi 1: ukuran berkas ---
+    size_mb = uploaded_file.size / (1024 * 1024)
+    if size_mb > MAX_MB:
+        st.error(f"❌ Ukuran berkas {size_mb:.1f} MB melebihi batas {MAX_MB} MB.")
+        st.stop()
+ 
+    if uploaded_file.size == 0:
+        st.error("❌ Berkas kosong. Silakan unggah berkas citra yang valid.")
+        st.stop()
+ 
+    # --- Validasi 2: integritas berkas citra ---
+    try:
+        img = Image.open(uploaded_file)
+        img.verify()                 # cek struktur berkas tanpa memuat piksel
+        uploaded_file.seek(0)        # verify() menutup berkas, buka ulang
+        img = Image.open(uploaded_file)
+        img = img.convert('RGB')     # tangani RGBA, grayscale, palet
+    except Exception:
+        st.error("❌ Berkas tidak dapat dibaca sebagai citra.")
+        st.info(
+            "Pastikan berkas yang diunggah benar-benar berupa gambar "
+            "berformat JPG, JPEG, atau PNG dan tidak dalam kondisi rusak."
+        )
+        st.stop()
+ 
+    # --- Validasi 3: dimensi minimum ---
+    if img.width < MIN_PIXEL or img.height < MIN_PIXEL:
+        st.error(
+            f"❌ Resolusi citra terlalu kecil ({img.width}×{img.height} piksel). "
+            f"Minimum {MIN_PIXEL}×{MIN_PIXEL} piksel."
+        )
+        st.stop()
+ 
+    try:
+        from PIL import ImageOps
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        pass
+ 
     main_col1, main_col2 = st.columns([1, 2])
-    
+ 
     with main_col1:
         st.image(img, caption="Gambar Input", use_container_width=True)
-    
-    img_resized = img.resize((224, 224))
+ 
+    img_resized = img.resize((224, 224), Image.NEAREST)   # selaras dgn pelatihan
     img_array = tf.keras.preprocessing.image.img_to_array(img_resized)
 
     if model_mobilenet is not None and model_efficientnet is not None:
