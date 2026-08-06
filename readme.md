@@ -7,12 +7,15 @@ Repositori ini berisi kode sumber dan implementasi sistem komparasi arsitektur D
 * Program Studi: S-1 Teknik Informatika, Universitas Padjadjaran
 
 ## Deskripsi Proyek
-Penelitian ini bertujuan untuk menganalisis trade-off antara akurasi prediksi dan efisiensi komputasi (waktu pelatihan) dari dua filosofi arsitektur lightweight CNN yang berbeda. Eksperimen dilakukan menggunakan teknik transfer learning (full layer freezing) dengan bobot pre-trained ImageNet. 
+
+Penelitian ini menganalisis trade-off antara akurasi prediksi dan efisiensi komputasi dari dua filosofi arsitektur lightweight CNN yang berbeda. Eksperimen dilakukan menggunakan teknik transfer learning dengan strategi **fine-tuning dua tahap** menggunakan bobot pre-trained ImageNet, yaitu tahap pemanasan dengan convolutional base dibekukan, dilanjutkan tahap fine-tuning dengan membuka 30 lapisan terakhir.
 
 Sistem mengimplementasikan pendekatan Top-3 Probability untuk meminimalisir ambiguitas visual akibat inter-class similarity tinggi pada ras anjing serumpun atau fase anak anjing (puppy).
 
 ## Daftar 15 Kategori Ras Anjing Eksperimen
-Eksperimen ini menggunakan subset data hasil kurasi manual dari Stanford Dogs Dataset yang mencakup 15 ras anjing berikut:
+
+Eksperimen menggunakan subset data hasil kurasi manual dari Stanford Dogs Dataset yang mencakup 15 ras anjing berikut:
+
 1. Beagle
 2. Boxer
 3. Chihuahua
@@ -29,29 +32,49 @@ Eksperimen ini menggunakan subset data hasil kurasi manual dari Stanford Dogs Da
 14. Siberian Husky
 15. Shih Tzu
 
-## Metrik Performa Model (15 Kelas)
-Berdasarkan hasil pengujian pada skenario 15 ras anjing (total 2.250 citra mentah dengan pembagian 80% training set dan 20% validation set), berikut adalah ringkasan performa akhir kedua model:
+## Konfigurasi Dataset
 
-* MobileNetV2
-  - Validation Accuracy (Top-1): 91.56%
-  - Validation Accuracy (Top-3): 99.11%
-  - Validation Loss: 0.2977
-  - Total Waktu Pelatihan: 20 menit 17 detik
+Total 2.593 citra mentah dibagi secara fisik dengan proporsi 60:20:20, yaitu 1.564 citra latih, 516 citra validasi, dan 513 citra uji. Testing set dipisahkan sejak awal dan tidak digunakan selama pelatihan maupun pemilihan model. Data latih diperkaya melalui augmentasi offline hingga setiap kelas berjumlah tepat 500 citra.
 
-* EfficientNet-B0
-  - Validation Accuracy (Top-1): 93.78%
-  - Validation Accuracy (Top-3): 100.00%
-  - Validation Loss: 0.1923
-  - Total Waktu Pelatihan: 20 menit 29 detik
+## Metrik Performa Model
+
+Seluruh metrik berikut dilaporkan dari testing set independen sebanyak 513 citra.
+
+| Metrik | MobileNetV2 | EfficientNet-B0 |
+|---|---|---|
+| Test Accuracy (Top-1) | 90,45% | 94,54% |
+| Test Accuracy (Top-3) | 98,83% | 99,81% |
+| Test Loss | 0,2612 | 0,1513 |
+| Jumlah Parameter | 2.277.199 | 4.068.786 |
+| Total Waktu Pelatihan | 6m 37s | 8m 11s |
+| Waktu Inferensi (CPU lokal) | 92,5 ms | 133,1 ms |
+
+Melalui pendekatan Top-3 Probability, 87,76% kesalahan prediksi pada MobileNetV2 dan 96,43% pada EfficientNet-B0 berhasil dipulihkan.
 
 ## Struktur Repositori
-* app.py: Skrip utama untuk menjalankan aplikasi web Streamlit.
-* requirements.txt: Daftar pustaka (dependencies) yang dibutuhkan oleh sistem.
-* mobile.weights.h5: File parameter bobot hasil pelatihan model MobileNetV2.
-* eff.weights.h5: File parameter bobot hasil pelatihan model EfficientNet-B0.
+
+* `app.py` — Skrip utama aplikasi web Streamlit
+* `tes_inference.py` — Skrip pengukuran waktu inferensi pada CPU lokal
+* `uji_ood.py` — Skrip pengujian masukan di luar cakupan secara batch
+* `dog-classification.ipynb` — Notebook pelatihan dan evaluasi model
+* `requirements.txt` — Daftar pustaka yang dibutuhkan sistem
+* `mobile.weights.h5` — Berkas bobot hasil pelatihan MobileNetV2
+* `eff.weights.h5` — Berkas bobot hasil pelatihan EfficientNet-B0
 
 ## Prasyarat Sistem
-Pastikan perangkat Anda telah terinstal Python (disarankan versi 3.11 atau 3.12). Instalasi pustaka pendukung dapat dilakukan dengan mengeksekusi perintah berikut pada terminal:
+
+Pastikan perangkat telah terinstal Python versi 3.11 atau 3.12. Instalasi pustaka pendukung dilakukan dengan perintah berikut:
 
 ```bash
 pip install -r requirements.txt
+```
+
+Aplikasi memerlukan koneksi internet pada eksekusi pertama untuk mengunduh bobot pre-trained ImageNet, yang diperlukan sebagai kerangka inisialisasi arsitektur. Setelah tersimpan pada cache lokal, aplikasi dapat dijalankan secara luring.
+
+## Menjalankan Aplikasi
+
+```bash
+streamlit run app.py
+```
+
+Aplikasi akan terbuka pada web, kemudian pengguna dapat mengunggah citra anjing berformat JPG, JPEG, atau PNG untuk memperoleh tiga kandidat ras teratas dari kedua arsitektur.
